@@ -45,6 +45,18 @@ class PositionEncodings(nn.Module):
         x = x + (self.encoding[:, :x.shape[1], :]).requires_grad_(False)
         return self.dropout(x)
     
+def LayerNormalization(nn.Module):
+    def __init__(self, features: int, eps:float=10**-6):
+        super().__init__()
+        self.eps = eps
+        self.alpha = nn.Parameter(torch.ones(features))
+        self.bias = nn.Parameter(torch.zeros(features))
+    
+    def forward(self, x):
+        mean = x.mean(-1, keepdim=True)
+        std = x.std(-1, keepdim=True)
+        return self.alpha * (x - mean) / (std + self.eps) + self.bias
+    
 class FeedForwardBlock(nn.Module):
     def __init__(self, d_model: int, d_ff: int, dropout: float):
         super().__init__()
@@ -54,3 +66,13 @@ class FeedForwardBlock(nn.Module):
 
     def forward(self, x):
         return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
+    
+class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model: int, h: int, dropout: float):
+        super().__init__()
+        self.d_model = d_model
+        self.h = h
+        assert d_model % h == 0, "d_model is not divisible by h"
+
+        self.d_k = d_model // h # Dimension head
+        self.w_q = nn.Linear(d_model, d_model, bias=False)
